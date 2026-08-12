@@ -1,78 +1,219 @@
-chrome.runtime.onMessage.addListener((request)=>{
+(function () {
+    "use strict";
 
-if(request.action!=="export")
-    return;
+    const REQUEST = "VSOL_SCOUT_GET_DATA";
+    const RESPONSE = "VSOL_SCOUT_DATA";
 
-const data={
+    let waitingResolve = null;
+    let waitingReject = null;
 
-match:{
+    window.addEventListener("message", function (event) {
 
-vs:window.my_vs,
+        if (event.source !== window) {
+            return;
+        }
 
-formation:window.v_formation,
+        if (!event.data) {
+            return;
+        }
 
-style:window.v_playstyle,
+        if (event.data.type !== RESPONSE) {
+            return;
+        }
 
-tactics:window.v_tactics,
+        if (!waitingResolve) {
+            return;
+        }
 
-superBonus:window.super_bonus,
+        const result = event.data.result;
 
-restBonus:window.rest_bonus
+        const resolve = waitingResolve;
 
-},
+        waitingResolve = null;
+        waitingReject = null;
 
-players:[]
+        resolve(result);
+    });
 
-};
+    function requestData() {
 
-for(let i=0;i<window.plr_names.length;i++){
+        return new Promise((resolve, reject) => {
 
-data.players.push({
+            waitingResolve = resolve;
+            waitingReject = reject;
 
-name:window.plr_names[i],
+            window.postMessage({
+                type: REQUEST
+            }, "*");
 
-position:window.plr_pos[i],
+            setTimeout(() => {
 
-strength:window.plr_str[i],
+                if (!waitingResolve) {
+                    return;
+                }
 
-form:window.plr_fiza[i],
+                waitingResolve = null;
+                waitingReject = null;
 
-style:window.plr_styles[i],
+                reject(
+                    new Error(
+                        "ВСОЛ не ответил. Возможно, страница еще не загрузилась."
+                    )
+                );
 
-injury:window.plr_injury[i],
+            }, 5000);
+        });
+    }
 
-disq:window.plr_disq[i],
+    function downloadJson(data) {
 
-special1:window.plr_sp1_core[i],
+        const json = JSON.stringify(data, null, 2);
 
-special1Level:window.plr_sp1_level[i],
+        const blob = new Blob(
+            [json],
+            {
+                type: "application/json;charset=utf-8"
+            }
+        );
 
-special2:window.plr_sp2_core[i],
+        const url = URL.createObjectURL(blob);
 
-special2Level:window.plr_sp2_level[i]
+        const link = document.createElement("a");
 
-});
+        link.href = url;
 
-}
+        const matchId =
+            data.match && data.match.id
+                ? data.match.id
+                : "unknown";
 
-const blob=new Blob(
-[
-JSON.stringify(data,null,4)
-],
-{
-type:"application/json"
-});
+        link.download = `vsol-match-${matchId}.json`;
 
-const url=URL.createObjectURL(blob);
+        document.body.appendChild(link);
 
-const a=document.createElement("a");
+        link.click();
 
-a.href=url;
+        link.remove();
 
-a.download="vsol_match.json";
+        setTimeout(() => {
+            URL.revokeObjectURL(url);
+        }, 1000);
+    }
 
-a.click();
+    function copyJson(data) {
 
-URL.revokeObjectURL(url);
+        const json = JSON.stringify(data, null, 2);
 
-});
+        return navigator.clipboard.writeText(json);
+    }
+
+    chrome.runtime.onMessage.addListener(
+        (request, sender, sendResponse) => {
+
+            if (!request || request.action !== "getMatchData") {
+                return;
+            }
+
+            requestData()
+                .then(result => {
+
+                    if (!result.success) {
+
+                        sendResponse({
+                            success: false,
+                            errors: result.errors
+                        });
+
+                        return;
+                    }
+
+                    sendResponse({
+                        success: true,
+                        data: result.data
+                    });
+                })
+                .catch(error => {
+
+                    sendResponse({
+                        success: false,
+                        errors: [error.message]
+                    });
+                });
+
+            return true;
+        }
+    );
+
+    chrome.runtime.onMessage.addListener(
+        (request, sender, sendResponse) => {
+
+            if (!request || request.action !== "downloadJson") {
+                return;
+            }
+
+            if (!request.data) {
+
+                sendResponse({
+                    success: false,
+                    error: "Нет данных для скачивания."
+                });
+
+                return;
+            }
+
+            try {
+
+                downloadJson(request.data);
+
+                sendResponse({
+                    success: true
+                });
+
+            } catch (error) {
+
+                sendResponse({
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+    );
+
+    chrome.runtime.onMessage.addListener(
+        (request, sender, sendResponse) => {
+
+            if (!request || request.action !== "copyJson") {
+                return;
+            }
+
+            if (!request.data) {
+
+                sendResponse({
+                    success: false,
+                    error: "Нет данных для копирования."
+                });
+
+                return;
+            }
+
+            copyJson(request.data)
+                .then(() => {
+
+                    sendResponse({
+                        success: true
+                    });
+
+                })
+                .catch(error => {
+
+                    sendResponse({
+                        success: false,
+                        error: error.message
+                    });
+                });
+
+            return true;
+        }
+    );
+
+})();
