@@ -235,15 +235,21 @@
              */
 
             const opponentId =
-                match.opponentId;
-
-            if (!opponentId) {
-
+                Number(match.opponentId);
+            
+            if (
+                !opponentId ||
+                !Number.isInteger(opponentId)
+            ) {
                 throw new Error(
-                    "Не найден ID соперника."
+                    "Не найден корректный ID соперника."
                 );
             }
-
+            
+            console.log(
+                "VSOL Scout: ID соперника =",
+                opponentId
+            );
             setStatus(
                 `Соперник найден: ID ${opponentId}. Загружаю ростер...`
             );
