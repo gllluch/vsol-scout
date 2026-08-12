@@ -1,13 +1,12 @@
 (function () {
     "use strict";
 
-    const REQUEST = "VSOL_SCOUT_GET_DATA";
-    const RESPONSE = "VSOL_SCOUT_DATA";
+    const REQUEST = "VSOL_SCOUT_GET_PAGE_DATA";
+    const RESPONSE = "VSOL_SCOUT_PAGE_DATA";
 
-    let waitingResolve = null;
-    let waitingReject = null;
+    let resolver = null;
 
-    window.addEventListener("message", function (event) {
+    window.addEventListener("message", event => {
 
         if (event.source !== window) {
             return;
@@ -21,43 +20,39 @@
             return;
         }
 
-        if (!waitingResolve) {
+        if (!resolver) {
             return;
         }
 
-        const result = event.data.result;
+        const resolve = resolver;
 
-        const resolve = waitingResolve;
+        resolver = null;
 
-        waitingResolve = null;
-        waitingReject = null;
-
-        resolve(result);
+        resolve(event.data.result);
     });
 
-    function requestData() {
+    function getPageData(mode = "page") {
 
         return new Promise((resolve, reject) => {
 
-            waitingResolve = resolve;
-            waitingReject = reject;
+            resolver = resolve;
 
             window.postMessage({
-                type: REQUEST
+                type: REQUEST,
+                mode
             }, "*");
 
             setTimeout(() => {
 
-                if (!waitingResolve) {
+                if (!resolver) {
                     return;
                 }
 
-                waitingResolve = null;
-                waitingReject = null;
+                resolver = null;
 
                 reject(
                     new Error(
-                        "ВСОЛ не ответил. Возможно, страница еще не загрузилась."
+                        "Страница ВСОЛ не ответила."
                     )
                 );
 
@@ -67,27 +62,30 @@
 
     function downloadJson(data) {
 
-        const json = JSON.stringify(data, null, 2);
+        const json = JSON.stringify(
+            data,
+            null,
+            2
+        );
 
         const blob = new Blob(
             [json],
             {
-                type: "application/json;charset=utf-8"
+                type:
+                    "application/json;charset=utf-8"
             }
         );
 
-        const url = URL.createObjectURL(blob);
+        const url =
+            URL.createObjectURL(blob);
 
-        const link = document.createElement("a");
+        const link =
+            document.createElement("a");
 
         link.href = url;
 
-        const matchId =
-            data.match && data.match.id
-                ? data.match.id
-                : "unknown";
-
-        link.download = `vsol-match-${matchId}.json`;
+        link.download =
+            `vsol-scout-${Date.now()}.json`;
 
         document.body.appendChild(link);
 
@@ -95,49 +93,39 @@
 
         link.remove();
 
-        setTimeout(() => {
-            URL.revokeObjectURL(url);
-        }, 1000);
-    }
-
-    function copyJson(data) {
-
-        const json = JSON.stringify(data, null, 2);
-
-        return navigator.clipboard.writeText(json);
+        setTimeout(
+            () => URL.revokeObjectURL(url),
+            1000
+        );
     }
 
     chrome.runtime.onMessage.addListener(
         (request, sender, sendResponse) => {
 
-            if (!request || request.action !== "getMatchData") {
+            if (
+                !request ||
+                request.action !==
+                "collectPage"
+            ) {
                 return;
             }
 
-            requestData()
-                .then(result => {
-
-                    if (!result.success) {
-
-                        sendResponse({
-                            success: false,
-                            errors: result.errors
-                        });
-
-                        return;
-                    }
+            getPageData(request.mode)
+                .then(data => {
 
                     sendResponse({
                         success: true,
-                        data: result.data
+                        data
                     });
+
                 })
                 .catch(error => {
 
                     sendResponse({
                         success: false,
-                        errors: [error.message]
+                        error: error.message
                     });
+
                 });
 
             return true;
@@ -147,17 +135,11 @@
     chrome.runtime.onMessage.addListener(
         (request, sender, sendResponse) => {
 
-            if (!request || request.action !== "downloadJson") {
-                return;
-            }
-
-            if (!request.data) {
-
-                sendResponse({
-                    success: false,
-                    error: "Нет данных для скачивания."
-                });
-
+            if (
+                !request ||
+                request.action !==
+                "downloadJson"
+            ) {
                 return;
             }
 
@@ -176,43 +158,6 @@
                     error: error.message
                 });
             }
-        }
-    );
-
-    chrome.runtime.onMessage.addListener(
-        (request, sender, sendResponse) => {
-
-            if (!request || request.action !== "copyJson") {
-                return;
-            }
-
-            if (!request.data) {
-
-                sendResponse({
-                    success: false,
-                    error: "Нет данных для копирования."
-                });
-
-                return;
-            }
-
-            copyJson(request.data)
-                .then(() => {
-
-                    sendResponse({
-                        success: true
-                    });
-
-                })
-                .catch(error => {
-
-                    sendResponse({
-                        success: false,
-                        error: error.message
-                    });
-                });
-
-            return true;
         }
     );
 
