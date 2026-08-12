@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="ru">
 
 <head>
@@ -13,43 +14,62 @@
 
 <body>
 
-    <div class="container">
+<div class="container">
 
-        <div class="title">
-            VSOL Scout
-        </div>
+    <div class="title">
+        VSOL Scout
+    </div>
 
-        <div class="version">
-            v0.1.1
-        </div>
+    <div class="version">
+        v0.1.2 — разведка
+    </div>
 
-        <button id="collect">
-            📊 Получить данные матча
-        </button>
+    <button id="scan">
+        🔎 Сканировать матч
+    </button>
 
-        <div id="status" class="status">
-            Откройте страницу подготовки к матчу
-        </div>
+    <div id="status" class="status">
+        Откройте страницу подготовки к матчу
+    </div>
 
-        <div id="result" class="result hidden">
+    <div id="result" class="hidden">
+
+        <div class="section">
+            <div class="section-title">
+                Матч
+            </div>
 
             <div id="matchInfo"></div>
-
-            <div id="playerInfo"></div>
-
-            <button id="download" class="secondary">
-                💾 Скачать JSON
-            </button>
-
-            <button id="copy" class="secondary">
-                📋 Скопировать JSON
-            </button>
-
         </div>
+
+        <div class="section">
+            <div class="section-title">
+                Состав
+            </div>
+
+            <div id="squadInfo"></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">
+                Разведка
+            </div>
+
+            <div id="scoutInfo"></div>
+        </div>
+
+        <button
+            id="download"
+            class="secondary"
+        >
+            💾 Скачать разведку
+        </button>
 
     </div>
 
-    <script src="popup.js"></script>
+</div>
+
+<script src="popup.js"></script>
 
 </body>
 
