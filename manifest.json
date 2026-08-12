@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "VSOL Scout",
-  "description": "Экспорт данных матча ВСОЛ",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "description": "Сбор данных матча Виртуальной Футбольной Лиги для последующего анализа",
 
   "permissions": [
-    "activeTab",
-    "downloads"
+    "activeTab"
   ],
 
   "host_permissions": [
@@ -20,12 +19,23 @@
       ],
       "js": [
         "content.js"
-      ]
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.virtualsoccer.ru/mng_order.php*"
+      ],
+      "js": [
+        "page-bridge.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
     }
   ],
 
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "VSOL Scout"
+    "default_title": "VSOL Scout",
+    "default_popup": "popup.html"
   }
 }
