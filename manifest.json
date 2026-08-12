@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "VSOL Scout",
-  "version": "0.1.1",
-  "description": "Сбор данных матча Виртуальной Футбольной Лиги для последующего анализа",
+  "version": "0.1.2",
+  "description": "Разведка и сбор данных матчей ВСОЛ",
 
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
 
   "host_permissions": [
@@ -15,7 +16,10 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.virtualsoccer.ru/mng_order.php*"
+        "https://www.virtualsoccer.ru/mng_order.php*",
+        "https://www.virtualsoccer.ru/roster.php*",
+        "https://www.virtualsoccer.ru/mng_*.php*",
+        "https://www.virtualsoccer.ru/match.php*"
       ],
       "js": [
         "content.js"
@@ -24,7 +28,10 @@
     },
     {
       "matches": [
-        "https://www.virtualsoccer.ru/mng_order.php*"
+        "https://www.virtualsoccer.ru/mng_order.php*",
+        "https://www.virtualsoccer.ru/roster.php*",
+        "https://www.virtualsoccer.ru/mng_*.php*",
+        "https://www.virtualsoccer.ru/match.php*"
       ],
       "js": [
         "page-bridge.js"
