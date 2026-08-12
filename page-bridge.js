@@ -45,47 +45,57 @@
 
     function getOpponentId() {
 
-        // 1. Явная переменная страницы
+        const links = getLinks();
+    
+        /*
+         * На странице подготовки к матчу ВСОЛ
+         * первой ссылкой roster.php является
+         * текущий соперник.
+         */
+    
+        const rosterLinks = links.filter(link =>
+            /\/roster\.php\?num=\d+/i.test(link.href)
+        );
+    
+        if (rosterLinks.length > 0) {
+    
+            const match = rosterLinks[0].href.match(
+                /[?&]num=(\d+)/
+            );
+    
+            if (match) {
+    
+                return Number(match[1]);
+            }
+        }
+    
+        /*
+         * Fallback:
+         * пробуем известные JS-переменные.
+         */
+    
         const candidates = [
             getValue("teamId"),
             getValue("opponentId"),
             getValue("opponent_id"),
             getValue("team_id")
         ];
-
+    
         for (const value of candidates) {
+    
             if (
                 value !== null &&
                 value !== undefined &&
                 /^\d+$/.test(String(value))
             ) {
+    
                 return Number(value);
             }
         }
-
-        // 2. Ищем ссылки на roster.php
-        const links = getLinks();
-
-        const rosterLinks = links.filter(link =>
-            /\/roster\.php\?num=\d+/i.test(link.href)
-        );
-
-        // Если на странице ровно одна подходящая ссылка —
-        // это наиболее вероятный ID соперника.
-        if (rosterLinks.length === 1) {
-
-            const match =
-                rosterLinks[0].href.match(
-                    /[?&]num=(\d+)/
-                );
-
-            if (match) {
-                return Number(match[1]);
-            }
-        }
-
+    
         return null;
     }
+
 
     function collectPlayers() {
 
