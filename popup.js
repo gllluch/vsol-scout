@@ -1,19 +1,33 @@
 (function () {
     "use strict";
 
-    let currentData = null;
+    let scoutData = null;
 
-    const collectButton = document.getElementById("collect");
-    const downloadButton = document.getElementById("download");
-    const copyButton = document.getElementById("copy");
+    const scanButton =
+        document.getElementById("scan");
 
-    const status = document.getElementById("status");
-    const result = document.getElementById("result");
+    const downloadButton =
+        document.getElementById("download");
 
-    const matchInfo = document.getElementById("matchInfo");
-    const playerInfo = document.getElementById("playerInfo");
+    const status =
+        document.getElementById("status");
 
-    function setStatus(text, type = "") {
+    const result =
+        document.getElementById("result");
+
+    const matchInfo =
+        document.getElementById("matchInfo");
+
+    const squadInfo =
+        document.getElementById("squadInfo");
+
+    const scoutInfo =
+        document.getElementById("scoutInfo");
+
+    function setStatus(
+        text,
+        type = ""
+    ) {
 
         status.textContent = text;
 
@@ -24,9 +38,12 @@
         }
     }
 
-    function escapeHtml(value) {
+    function esc(value) {
 
-        if (value === null || value === undefined) {
+        if (
+            value === null ||
+            value === undefined
+        ) {
             return "";
         }
 
@@ -35,142 +52,264 @@
             .replaceAll("<", "&lt;")
             .replaceAll(">", "&gt;")
             .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
+            .replaceAll(
+                "'",
+                "&#039;"
+            );
     }
 
-    function showData(data) {
+    async function activeTab() {
 
-        currentData = data;
-
-        result.classList.remove("hidden");
-
-        const match = data.match || {};
-
-        matchInfo.innerHTML = `
-            <div class="info-row">
-                <span class="info-label">Матч:</span>
-                <span class="info-value">
-                    ${escapeHtml(match.name || "Чемпионат")}
-                </span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">ID матча:</span>
-                <span class="info-value">
-                    ${escapeHtml(match.id)}
-                </span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Vs:</span>
-                <span class="info-value">
-                    ${escapeHtml(match.teamVs)}
-                </span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Схема:</span>
-                <span class="info-value">
-                    ${escapeHtml(match.formation)}
-                </span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Тактика:</span>
-                <span class="info-value">
-                    ${escapeHtml(match.tactics)}
-                </span>
-            </div>
-
-            <div class="info-row">
-                <span class="info-label">Стиль:</span>
-                <span class="info-value">
-                    ${escapeHtml(match.gameStyle)}
-                </span>
-            </div>
-        `;
-
-        const players = Array.isArray(data.players)
-            ? data.players
-            : [];
-
-        playerInfo.innerHTML = `
-            <div class="info-row">
-                <span class="info-label">Игроков собрано:</span>
-                <span class="info-value">
-                    ${players.length}
-                </span>
-            </div>
-        `;
-    }
-
-    async function getActiveTab() {
-
-        const tabs = await chrome.tabs.query({
-            active: true,
-            currentWindow: true
-        });
+        const tabs =
+            await chrome.tabs.query({
+                active: true,
+                currentWindow: true
+            });
 
         if (!tabs.length) {
-            throw new Error("Активная вкладка не найдена.");
+            throw new Error(
+                "Активная вкладка не найдена."
+            );
         }
 
         return tabs[0];
     }
 
-    collectButton.addEventListener("click", async () => {
+    async function collectTab(
+        tabId,
+        mode = "page"
+    ) {
 
-        result.classList.add("hidden");
-
-        collectButton.disabled = true;
-
-        setStatus("Получаю данные со страницы ВСОЛ...");
-
-        try {
-
-            const tab = await getActiveTab();
-
-            if (!tab.url ||
-                !tab.url.startsWith(
-                    "https://www.virtualsoccer.ru/mng_order.php"
-                )) {
-
-                throw new Error(
-                    "Откройте страницу подготовки к матчу ВСОЛ."
-                );
-            }
-
-            const response = await chrome.tabs.sendMessage(
-                tab.id,
+        const response =
+            await chrome.tabs.sendMessage(
+                tabId,
                 {
-                    action: "getMatchData"
+                    action: "collectPage",
+                    mode
                 }
             );
 
-            if (!response) {
+        if (
+            !response ||
+            !response.success
+        ) {
+
+            throw new Error(
+                response?.error ||
+                "Не удалось получить данные страницы."
+            );
+        }
+
+        return response.data;
+    }
+
+    async function openScoutTab(url) {
+
+        const tab =
+            await chrome.tabs.create({
+                url,
+                active: false
+            });
+
+        await waitForTab(tab.id);
+
+        return tab;
+    }
+
+    function waitForTab(tabId) {
+
+        return new Promise(
+            (resolve, reject) => {
+
+                const timeout =
+                    setTimeout(() => {
+
+                        chrome.tabs.onUpdated.removeListener(
+                            listener
+                        );
+
+                        reject(
+                            new Error(
+                                "Страница слишком долго загружается."
+                            )
+                        );
+
+                    }, 15000);
+
+                function listener(
+                    updatedTabId,
+                    changeInfo
+                ) {
+
+                    if (
+                        updatedTabId !== tabId
+                    ) {
+                        return;
+                    }
+
+                    if (
+                        changeInfo.status ===
+                        "complete"
+                    ) {
+
+                        clearTimeout(timeout);
+
+                        chrome.tabs.onUpdated.removeListener(
+                            listener
+                        );
+
+                        setTimeout(
+                            resolve,
+                            500
+                        );
+                    }
+                }
+
+                chrome.tabs.onUpdated.addListener(
+                    listener
+                );
+            }
+        );
+    }
+
+    function findMatchLinks(
+        links
+    ) {
+
+        return links
+            .filter(link =>
+                /\/match\.php/i.test(
+                    link.href
+                )
+            )
+            .map(link => ({
+                text: link.text,
+                href: link.href
+            }));
+    }
+
+    async function scan() {
+
+        scanButton.disabled = true;
+
+        result.classList.add(
+            "hidden"
+        );
+
+        setStatus(
+            "Сканирую страницу матча..."
+        );
+
+        let opponentTab = null;
+
+        try {
+
+            const current =
+                await activeTab();
+
+            if (
+                !current.url ||
+                !current.url.includes(
+                    "/mng_order.php"
+                )
+            ) {
 
                 throw new Error(
-                    "Расширение не получило ответ от страницы."
+                    "Сначала откройте страницу подготовки к матчу."
                 );
             }
 
-            if (!response.success) {
+            const match =
+                await collectTab(
+                    current.id,
+                    "match"
+                );
 
-                const errors =
-                    response.errors || [
-                        "Не удалось получить данные."
-                    ];
+            /*
+             * ВАЖНО:
+             *
+             * teamId в новой структуре
+             * считаем ID соперника.
+             *
+             * my_vs = Vs соперника.
+             */
+
+            const opponentId =
+                match.opponentId;
+
+            if (!opponentId) {
 
                 throw new Error(
-                    errors.join("; ")
+                    "Не найден ID соперника."
                 );
             }
-
-            showData(response.data);
 
             setStatus(
-                `Данные получены: ${response.data.players.length} игроков.`,
+                `Соперник найден: ID ${opponentId}. Загружаю ростер...`
+            );
+
+            const rosterUrl =
+                `https://www.virtualsoccer.ru/roster.php?num=${opponentId}`;
+
+            opponentTab =
+                await openScoutTab(
+                    rosterUrl
+                );
+
+            const opponent =
+                await collectTab(
+                    opponentTab.id,
+                    "page"
+                );
+
+            const matchLinks =
+                findMatchLinks(
+                    opponent.links
+                );
+
+            setStatus(
+                `Соперник загружен. Найдено ссылок на матчи: ${matchLinks.length}`,
                 "success"
+            );
+
+            scoutData = {
+
+                scoutVersion:
+                    "0.1.2",
+
+                collectedAt:
+                    new Date().toISOString(),
+
+                match: {
+
+                    source:
+                        match,
+
+                    opponent: {
+
+                        id:
+                            opponentId,
+
+                        vs:
+                            match.teamVs,
+
+                        roster:
+                            opponent
+                    }
+                },
+
+                history: {
+
+                    available:
+                        matchLinks.length > 0,
+
+                    matches:
+                        matchLinks
+                }
+            };
+
+            showResult(
+                scoutData
             );
 
         } catch (error) {
@@ -178,94 +317,199 @@
             console.error(error);
 
             setStatus(
-                `Ошибка: ${error.message}`,
+                error.message,
                 "error"
             );
 
         } finally {
 
-            collectButton.disabled = false;
-        }
-    });
+            if (opponentTab) {
 
-    downloadButton.addEventListener("click", async () => {
-
-        if (!currentData) {
-            return;
-        }
-
-        try {
-
-            const tab = await getActiveTab();
-
-            const response = await chrome.tabs.sendMessage(
-                tab.id,
-                {
-                    action: "downloadJson",
-                    data: currentData
-                }
-            );
-
-            if (!response || !response.success) {
-
-                throw new Error(
-                    response?.error ||
-                    "Не удалось скачать JSON."
-                );
+                try {
+                    await chrome.tabs.remove(
+                        opponentTab.id
+                    );
+                } catch (_) {}
             }
 
-            setStatus(
-                "JSON успешно скачан.",
-                "success"
-            );
-
-        } catch (error) {
-
-            setStatus(
-                `Ошибка скачивания: ${error.message}`,
-                "error"
-            );
+            scanButton.disabled = false;
         }
-    });
+    }
 
-    copyButton.addEventListener("click", async () => {
+    function showResult(data) {
 
-        if (!currentData) {
-            return;
-        }
+        result.classList.remove(
+            "hidden"
+        );
 
-        try {
+        const match =
+            data.match.source.match ||
+            {};
 
-            const tab = await getActiveTab();
+        const opponent =
+            data.match.opponent;
 
-            const response = await chrome.tabs.sendMessage(
-                tab.id,
-                {
-                    action: "copyJson",
-                    data: currentData
-                }
-            );
+        const players =
+            data.match.source.players ||
+            [];
 
-            if (!response || !response.success) {
+        const history =
+            data.history.matches ||
+            [];
 
-                throw new Error(
-                    response?.error ||
-                    "Не удалось скопировать JSON."
-                );
+        matchInfo.innerHTML = `
+
+            <div class="info-row">
+                <span class="label">
+                    ID матча:
+                </span>
+
+                <span class="value">
+                    ${esc(match.id)}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">
+                    ID соперника:
+                </span>
+
+                <span class="value">
+                    ${esc(opponent.id)}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">
+                    Vs соперника:
+                </span>
+
+                <span class="value">
+                    ${esc(opponent.vs)}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">
+                    Стиль:
+                </span>
+
+                <span class="value">
+                    ${esc(match.gameStyle)}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="label">
+                    Тактика:
+                </span>
+
+                <span class="value">
+                    ${esc(match.tactics)}
+                </span>
+            </div>
+
+        `;
+
+        squadInfo.innerHTML = `
+
+            <div class="info-row">
+
+                <span class="label">
+                    Игроков:
+                </span>
+
+                <span class="value">
+                    ${players.length}
+                </span>
+
+            </div>
+
+        `;
+
+        scoutInfo.innerHTML = `
+
+            <div class="info-row">
+
+                <span class="label">
+                    Страница соперника:
+                </span>
+
+                <span class="value">
+                    получена
+                </span>
+
+            </div>
+
+            <div class="info-row">
+
+                <span class="label">
+                    Ссылок на матчи:
+                </span>
+
+                <span class="value">
+                    ${history.length}
+                </span>
+
+            </div>
+
+        `;
+    }
+
+    scanButton.addEventListener(
+        "click",
+        scan
+    );
+
+    downloadButton.addEventListener(
+        "click",
+        async () => {
+
+            if (!scoutData) {
+                return;
             }
 
-            setStatus(
-                "JSON скопирован в буфер обмена.",
-                "success"
-            );
+            try {
 
-        } catch (error) {
+                const tab =
+                    await activeTab();
 
-            setStatus(
-                `Ошибка копирования: ${error.message}`,
-                "error"
-            );
+                const response =
+                    await chrome.tabs.sendMessage(
+                        tab.id,
+                        {
+                            action:
+                                "downloadJson",
+
+                            data:
+                                scoutData
+                        }
+                    );
+
+                if (
+                    !response ||
+                    !response.success
+                ) {
+
+                    throw new Error(
+                        response?.error ||
+                        "Ошибка скачивания."
+                    );
+                }
+
+                setStatus(
+                    "Разведка сохранена.",
+                    "success"
+                );
+
+            } catch (error) {
+
+                setStatus(
+                    error.message,
+                    "error"
+                );
+            }
         }
-    });
+    );
 
 })();
